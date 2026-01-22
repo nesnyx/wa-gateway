@@ -5,6 +5,7 @@ import * as QRCode from 'qrcode';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Whatsapp } from './entities/whatsapp.entity';
 import { Repository } from 'typeorm';
+import { SendMessageDto } from './dto/send-message.dto';
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -44,11 +45,23 @@ export class WhatsappController {
     const session = await this.whatsappService.findOneBySessionId(sessionId);
     if (!session) return { message: 'Session not found' };
     const qrBuffer = await QRCode.toBuffer(session.session_qr, {
-      errorCorrectionLevel: 'H', // Tingkatkan presisi agar mudah discan
+      errorCorrectionLevel: 'H',
       margin: 4,
       scale: 10
     });
     return new StreamableFile(qrBuffer);
+  }
+
+
+  @Post("send-message")
+  async sendMessage(@Body() sendMessageDto: SendMessageDto) {
+    return await this.whatsappService.sendMessage(
+      sendMessageDto.sessionId,
+      sendMessageDto.target,
+      sendMessageDto.message
+    );
+
+
   }
 
 

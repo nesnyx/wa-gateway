@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Status, Whatsapp } from './entities/whatsapp.entity';
 import { Repository } from 'typeorm';
@@ -8,75 +8,113 @@ import makeWASocket, {
   ConnectionState,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
+import { promises as fsPromises } from 'fs';
 import * as path from 'path';
-import * as fs from 'fs';
 import pino from 'pino';
 import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
-  private sessions = new Map();
+  private sessions = new Map<string, any>();
   constructor(
     @InjectRepository(Whatsapp)
     private whatsappRepository: Repository<Whatsapp>
   ) { }
 
-  async createSession(sessionId: string) {
-    const sessionPath = path.join(__dirname, `./src/modules/whatsapp/sessions/${sessionId}`);
-    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
+  async onModuleInit() {
+    const activeSessions = await this.whatsappRepository.find({ where: { status: 'CONNECTED' } });
+
+    for (const session of activeSessions) {
+      this.logger.log(`Restoring session: ${session.session}`);
+      this.createSession(session.session).catch(err => {
+        this.logger.error(`Gagal restore session ${session.session}: ${err.message}`);
+      });
+    }
+  }
+
+  async createSession(sessionId: string) {
+    const sessionPath = path.join(process.cwd(), `/src/modules/whatsapp/sessions/${sessionId}`);
+    console.log(sessionPath)
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const sock: any = makeWASocket({
       auth: state,
-      defaultQueryTimeoutMs: 60000,
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }) as any,
+      browser: ['Gemini Bot', 'Chrome', '1.0.0'],
     });
-
+    this.sessions.set(sessionId, sock);
+    sock.ev.on('creds.update', saveCreds)
     sock.ev.on('connection.update', async (update: Partial<ConnectionState>) => {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        console.log(`QR Code generated for session: ${sessionId}`);
         await this.whatsappRepository.update(
           { session: sessionId },
           { session_qr: qr, status: Status.PENDING }
         );
-        console.log('QR Baru telah diperbarui di Database');
+        this.logger.log(`QR Code generated for session: ${sessionId}`);
       }
 
       if (connection === 'close') {
-        const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-        console.log(`Connection closed for ${sessionId}. Reconnecting: ${shouldReconnect}`);
+        const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
         if (shouldReconnect) {
+          this.logger.warn(`Reconnecting session: ${sessionId}`);
           this.createSession(sessionId);
         } else {
-          fs.rmSync(sessionPath, { recursive: true, force: true });
-          await this.whatsappRepository.update({ session: sessionId }, { status: Status.DISCONNECTED, session_qr: undefined });
+          this.logger.error(`Session ${sessionId} Logged Out`);
+          this.sessions.delete(sessionId);
+          await fsPromises.rm(sessionPath, { recursive: true, force: true }).catch(err => {
+            this.logger.error(`Gagal menghapus folder sesi ${sessionPath}:`, err);
+          });
+          await this.whatsappRepository.update(
+            { session: sessionId },
+            { status: Status.DISCONNECTED, session_qr: undefined, phone_number: undefined }
+          );
         }
       } else if (connection === 'open') {
-        console.log(`Session ${sessionId} is now active!`);
-        const phoneNumber = sock.user.id.split(':')[0];
+        const phoneNumber = sock.user.id.split(':')[0].split('@')[0];
+        this.logger.log(`Session ${sessionId} CONNECTED with ${phoneNumber}`);
 
         await this.whatsappRepository.update(
           { session: sessionId },
-          {
-            status: Status.CONNECTED,
-            session_qr: undefined,
-            phone_number: phoneNumber
-          }
+          { status: Status.CONNECTED, session_qr: undefined, phone_number: phoneNumber }
         );
       }
     });
-    sock.ev.on('creds.update', saveCreds);
-    this.sessions.set(sessionId, sock);
-    return sock;
+  }
+
+  async sendMessage(sessionId: string, target: string, message: string) {
+    const sock = this.sessions.get(sessionId);
+    if (!sock) {
+      throw new BadRequestException(`Session ${sessionId} tidak ada di memori.`);
+    }
+    const formattedTarget = `${target}@s.whatsapp.net`;
+    try {
+      return await Promise.race([
+        sock.sendMessage(formattedTarget, { text: message }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT_WHATSAPP_SERVER')), 15000)
+        ),
+      ]);
+    } catch (error) {
+      this.logger.error(`Gagal kirim pesan ke ${target}: ${error.message}`);
+      throw new BadRequestException(`Gagal kirim: ${error.message}`);
+    }
   }
 
 
   async findOneBySessionId(session: string) {
     return await this.whatsappRepository.findOneBy({ session })
   }
+
+  async findAll() {
+    return await this.whatsappRepository.find()
+  }
+
+
 
 }
