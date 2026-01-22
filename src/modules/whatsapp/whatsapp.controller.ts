@@ -1,0 +1,55 @@
+import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header } from '@nestjs/common';
+import { WhatsappService } from './whatsapp.service';
+import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
+import * as QRCode from 'qrcode';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Whatsapp } from './entities/whatsapp.entity';
+import { Repository } from 'typeorm';
+
+@Controller('whatsapp')
+export class WhatsappController {
+  constructor(
+    @InjectRepository(Whatsapp)
+    private whatsappRepository: Repository<Whatsapp>,
+    private readonly whatsappService: WhatsappService) { }
+
+  @Post("generated-qr")
+  async create(@Body() createWhatsappDto: CreateWhatsappDto) {
+    let session = await this.whatsappRepository.findOneBy({ session: createWhatsappDto.session });
+    if (!session) {
+      session = this.whatsappRepository.create({ session: createWhatsappDto.session });
+      await this.whatsappRepository.save(session);
+    }
+    await this.whatsappService.createSession(session.session);
+    return {
+      message: 'Initializing session...',
+      sessionId: session.session,
+    };
+  }
+
+  @Get('status/:sessionId')
+  async getStatus(@Param('sessionId') sessionId: string) {
+    const session = await this.whatsappService.findOneBySessionId(sessionId);
+    if (!session) return { message: 'Session not found' };
+    return {
+      status: session.status,
+      qr: session.session_qr,
+      phoneNumber: session.phone_number
+    };
+  }
+
+  @Get('qr/:sessionId')
+  @Header('Content-Type', 'image/png')
+  async getQr(@Param('sessionId') sessionId: string) {
+    const session = await this.whatsappService.findOneBySessionId(sessionId);
+    if (!session) return { message: 'Session not found' };
+    const qrBuffer = await QRCode.toBuffer(session.session_qr, {
+      errorCorrectionLevel: 'H', // Tingkatkan presisi agar mudah discan
+      margin: 4,
+      scale: 10
+    });
+    return new StreamableFile(qrBuffer);
+  }
+
+
+}
