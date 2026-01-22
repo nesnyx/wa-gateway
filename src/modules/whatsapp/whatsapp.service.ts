@@ -17,6 +17,7 @@ import { Logger } from '@nestjs/common';
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private sessions = new Map<string, any>();
+  private autoReplyCooldown = new Map<string, number>();
   constructor(
     @InjectRepository(Whatsapp)
     private whatsappRepository: Repository<Whatsapp>
@@ -25,7 +26,6 @@ export class WhatsappService {
 
   async onModuleInit() {
     const activeSessions = await this.whatsappRepository.find({ where: { status: 'CONNECTED' } });
-
     for (const session of activeSessions) {
       this.logger.log(`Restoring session: ${session.session}`);
       this.createSession(session.session).catch(err => {
@@ -63,7 +63,9 @@ export class WhatsappService {
 
         if (shouldReconnect) {
           this.logger.warn(`Reconnecting session: ${sessionId}`);
-          this.createSession(sessionId);
+          setTimeout(() => {
+            this.createSession(sessionId);
+          }, 3000);
         } else {
           this.logger.error(`Session ${sessionId} Logged Out`);
           this.sessions.delete(sessionId);
@@ -85,6 +87,44 @@ export class WhatsappService {
         );
       }
     });
+
+
+    sock.ev.on('messages.upsert', async (m: any) => {
+      const messages = m.messages;
+
+      for (const message of messages) {
+        if (message.key.fromMe) continue;
+
+        const senderNumber = message.key.remoteJid?.replace('@s.whatsapp.net', '');
+        let messageBody = '';
+
+        if (message.message?.conversation) {
+          messageBody = message.message.conversation;
+        } else if (message.message?.extendedTextMessage?.text) {
+          messageBody = message.message.extendedTextMessage.text;
+        }
+
+        if (!messageBody) continue;
+
+        const cooldownTime = 10000; // 10 detik
+        const lastReply = this.autoReplyCooldown.get(senderNumber);
+        if (lastReply && Date.now() - lastReply < cooldownTime) {
+          continue;
+        }
+
+        this.autoReplyCooldown.set(senderNumber, Date.now());
+
+        this.logger.log(`[${sessionId}] Pesan dari ${senderNumber}: ${messageBody}`);
+
+        const replyMessage = `Halo! Terima kasih atas pesan Anda: "${messageBody}".`;
+
+        try {
+          await sock.sendMessage(message.key.remoteJid!, { text: replyMessage });
+        } catch (err) {
+          this.logger.error(`[${sessionId}] Gagal balas ke ${senderNumber}:`, err);
+        }
+      }
+    });
   }
 
   async sendMessage(sessionId: string, target: string, message: string) {
@@ -96,12 +136,14 @@ export class WhatsappService {
     try {
       return await Promise.race([
         sock.sendMessage(formattedTarget, { text: message }),
-        new Promise((_, reject) =>
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('TIMEOUT_WHATSAPP_SERVER')), 15000)
         ),
       ]);
     } catch (error) {
-      this.logger.error(`Gagal kirim pesan ke ${target}: ${error.message}`);
+      if (error.message === 'TIMEOUT_WHATSAPP_SERVER') {
+        this.logger.warn(`Timeout sending message to ${target}`);
+      }
       throw new BadRequestException(`Gagal kirim: ${error.message}`);
     }
   }
