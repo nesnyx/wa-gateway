@@ -86,7 +86,12 @@ export class WhatsappService {
           if (attempts >= 5) {
             this.logger.error(`[${sessionId}] Max reconnect attempts reached. Stopping.`);
             this.sessions.delete(sessionId);
-            await fsPromises.rm(sessionPath, { recursive: true, force: true });
+            await fsPromises.rm(sessionPath, {
+              recursive: true,
+              force: true,
+              maxRetries: 3,
+              retryDelay: 100
+            });
             await this.whatsappRepository.update(
               { session: sessionId },
               { status: Status.DISCONNECTED, session_qr: undefined, phone_number: undefined }

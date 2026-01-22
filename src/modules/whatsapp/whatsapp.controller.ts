@@ -14,14 +14,29 @@ export class WhatsappController {
     private whatsappRepository: Repository<Whatsapp>,
     private readonly whatsappService: WhatsappService) { }
 
+
+  @Get()
+  async findAll() {
+    return await this.whatsappService.findAll()
+  }
+
   @Post("generated-qr")
   async create(@Body() createWhatsappDto: CreateWhatsappDto) {
     let session = await this.whatsappRepository.findOneBy({ session: createWhatsappDto.session });
+
+    if (session && session.status === 'CONNECTED') {
+      return {
+        message: 'Session already connected',
+        sessionId: session.session,
+        status: session.status,
+      };
+    }
     if (!session) {
       session = this.whatsappRepository.create({ session: createWhatsappDto.session });
       await this.whatsappRepository.save(session);
     }
     await this.whatsappService.createSession(session.session);
+
     return {
       message: 'Initializing session...',
       sessionId: session.session,
@@ -67,6 +82,11 @@ export class WhatsappController {
   @Get("status-sessions")
   async statusSessions() {
     return await this.whatsappService.statusSessions();
+  }
+
+  @Get(":sessionId")
+  async findBySession(@Param() sessionId: string) {
+    return await this.whatsappService.findOneBySessionId(sessionId)
   }
 
 
