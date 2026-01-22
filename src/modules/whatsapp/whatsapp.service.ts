@@ -18,19 +18,38 @@ export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private sessions = new Map<string, any>();
   private autoReplyCooldown = new Map<string, number>();
+  private reconnectAttempts = new Map<string, number>();
   constructor(
     @InjectRepository(Whatsapp)
     private whatsappRepository: Repository<Whatsapp>
   ) { }
 
-
+  private async restoreSessionAsync(sessionId: string) {
+    this.logger.log(`Restoring session: ${sessionId}`);
+    try {
+      await this.createSession(sessionId);
+    } catch (err) {
+      this.logger.error(`Gagal restore session ${sessionId}: ${err.message}`);
+    }
+  }
   async onModuleInit() {
     const activeSessions = await this.whatsappRepository.find({ where: { status: 'CONNECTED' } });
     for (const session of activeSessions) {
-      this.logger.log(`Restoring session: ${session.session}`);
-      this.createSession(session.session).catch(err => {
-        this.logger.error(`Gagal restore session ${session.session}: ${err.message}`);
-      });
+      this.restoreSessionAsync(session.session);
+    }
+  }
+  async onModuleDestroy() {
+    for (const [sessionId, sock] of this.sessions.entries()) {
+      try {
+        await sock.logout()
+      } catch (err) {
+        this.logger.error(`Gagal logout session ${sessionId}:`, err);
+      }
+      this.sessions.delete(sessionId);
+      await this.whatsappRepository.update(
+        { session: sessionId },
+        { status: Status.DISCONNECTED }
+      );
     }
   }
 
@@ -41,7 +60,7 @@ export class WhatsappService {
     const sock: any = makeWASocket({
       auth: state,
       printQRInTerminal: false,
-      logger: pino({ level: 'silent' }) as any,
+      logger: pino({ level: 'silent' }),
       browser: ['Gemini Bot', 'Chrome', '1.0.0'],
     });
     this.sessions.set(sessionId, sock);
@@ -62,10 +81,28 @@ export class WhatsappService {
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
         if (shouldReconnect) {
-          this.logger.warn(`Reconnecting session: ${sessionId}`);
+          const attempts = this.reconnectAttempts.get(sessionId) || 0;
+
+          if (attempts >= 5) {
+            this.logger.error(`[${sessionId}] Max reconnect attempts reached. Stopping.`);
+            this.sessions.delete(sessionId);
+            await fsPromises.rm(sessionPath, { recursive: true, force: true });
+            await this.whatsappRepository.update(
+              { session: sessionId },
+              { status: Status.DISCONNECTED, session_qr: undefined, phone_number: undefined }
+            );
+            return;
+          }
+
+          this.reconnectAttempts.set(sessionId, attempts + 1);
+
+          const delay = Math.min(1000 * (2 ** attempts), 30000); // Exponential backoff, max 30 detik
+
+          this.logger.warn(`[${sessionId}] Reconnecting in ${delay}ms... (attempt ${attempts + 1})`);
+
           setTimeout(() => {
             this.createSession(sessionId);
-          }, 3000);
+          }, delay);
         } else {
           this.logger.error(`Session ${sessionId} Logged Out`);
           this.sessions.delete(sessionId);
@@ -88,7 +125,6 @@ export class WhatsappService {
       }
     });
 
-
     sock.ev.on('messages.upsert', async (m: any) => {
       const messages = m.messages;
 
@@ -106,25 +142,21 @@ export class WhatsappService {
 
         if (!messageBody) continue;
 
-        const cooldownTime = 10000; // 10 detik
+        const cooldownTime = 10000;
         const lastReply = this.autoReplyCooldown.get(senderNumber);
         if (lastReply && Date.now() - lastReply < cooldownTime) {
           continue;
         }
 
         this.autoReplyCooldown.set(senderNumber, Date.now());
-
-        this.logger.log(`[${sessionId}] Pesan dari ${senderNumber}: ${messageBody}`);
-
         const replyMessage = `Halo! Terima kasih atas pesan Anda: "${messageBody}".`;
-
         try {
           await sock.sendMessage(message.key.remoteJid!, { text: replyMessage });
         } catch (err) {
           this.logger.error(`[${sessionId}] Gagal balas ke ${senderNumber}:`, err);
         }
       }
-    });
+    })
   }
 
   async sendMessage(sessionId: string, target: string, message: string) {
@@ -155,6 +187,14 @@ export class WhatsappService {
 
   async findAll() {
     return await this.whatsappRepository.find()
+  }
+
+
+  async statusSessions() {
+    return Array.from(this.sessions.keys()).map(id => ({
+      sessionId: id,
+      connected: !!this.sessions.get(id),
+    }));
   }
 
 

@@ -64,5 +64,10 @@ export class WhatsappController {
 
   }
 
+  @Get("status-sessions")
+  async statusSessions() {
+    return await this.whatsappService.statusSessions();
+  }
+
 
 }
