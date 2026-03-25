@@ -55,7 +55,7 @@ export class WhatsappService {
   }
 
   async createSession(sessionId: string) {
-    const sessionsDir = path.join(process.cwd(), 'sessions'); // lebih aman, di root project
+    const sessionsDir = '/app/whatsapp-sessions'; // lebih aman, di root project
     const sessionPath = path.join(sessionsDir, sessionId);
 
     // Pastikan folder ada
