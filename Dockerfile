@@ -16,7 +16,7 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # Install semua dependencies termasuk devDependencies
-RUN npm ci --ignore-scripts
+RUN npm install
 
 COPY . .
 RUN npm run build
