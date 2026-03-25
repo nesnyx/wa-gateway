@@ -58,8 +58,8 @@ ENV PORT=3200
 EXPOSE 3200
 
 # Healthcheck (opsional tapi bagus)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3200 || exit 1
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD curl -f http://localhost:3200 || exit 1
 
 # Jalankan aplikasi
 CMD ["node", "dist/main.js"]

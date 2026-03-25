@@ -12,7 +12,7 @@ import { LoggerMiddleware } from './core/middleware/logger.middleware';
       isGlobal: true
     }), TypeOrmModule.forRoot({
       type: 'sqlite',
-      database: './db.sqlite',
+      database: './app/db.sqlite',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true,
       logging: false,
