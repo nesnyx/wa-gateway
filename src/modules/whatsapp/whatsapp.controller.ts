@@ -83,9 +83,8 @@ export class WhatsappController {
   async statusSessions() {
     return await this.whatsappService.statusSessions();
   }
-
   @Get(":sessionId")
-  async findBySession(@Param() sessionId: string) {
+  async findBySession(@Param('sessionId') sessionId: string) {
     return await this.whatsappService.findOneBySessionId(sessionId)
   }
 
