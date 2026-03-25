@@ -1,7 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { UserModule } from './modules/user/user.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './core/auth/auth.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { LoggerMiddleware } from './core/middleware/logger.middleware';
@@ -10,12 +10,18 @@ import { LoggerMiddleware } from './core/middleware/logger.middleware';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true
-    }), TypeOrmModule.forRoot({
-      type: 'sqlite',
-      database: './app/db.sqlite',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true,
-      logging: false,
+    }), TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get<string>('DB_HOST'),
+        port: config.get<number>('DB_PORT'),
+        username: config.get<string>('DB_USER'),
+        password: config.get<string>('DB_PASS'),
+        database: config.get<string>('DB_NAME'),
+        autoLoadEntities: true,
+        synchronize: true
+      }),
     }),
     UserModule, AuthModule, WhatsappModule],
   controllers: [],
