@@ -32,9 +32,9 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nestjs
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3200
 
-EXPOSE 3000
+EXPOSE 3200
 
 # ✅ Healthcheck dihapus sementara (Coolify sering bermasalah dengan ini)
 # CMD tetap pakai node langsung
