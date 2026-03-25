@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './core/auth/auth.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { LoggerMiddleware } from './core/middleware/logger.middleware';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { LoggerMiddleware } from './core/middleware/logger.middleware';
         synchronize: true
       }),
     }),
-    UserModule, AuthModule, WhatsappModule],
+    UserModule, AuthModule, WhatsappModule,HealthModule],
   controllers: [],
   providers: [],
 })

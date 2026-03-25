@@ -39,7 +39,7 @@ export class WhatsappController {
 
     return {
       message: 'Initializing session...',
-      sessionId: session.session,
+      sessionId: session,
     };
   }
 
