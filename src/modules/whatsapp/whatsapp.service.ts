@@ -6,13 +6,14 @@ import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
   ConnectionState,
+  fetchLatestBaileysVersion
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import { promises as fsPromises } from 'fs';
 import * as path from 'path';
 import pino from 'pino';
 import { Logger } from '@nestjs/common';
-
+import * as fs from "fs"
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
@@ -54,17 +55,31 @@ export class WhatsappService {
   }
 
   async createSession(sessionId: string) {
-    const sessionPath = path.join(process.cwd(), `/src/modules/whatsapp/sessions/${sessionId}`);
-    console.log(sessionPath)
+    const sessionsDir = '/app/whatsapp-sessions'; // lebih aman, di root project
+    const sessionPath = path.join(sessionsDir, sessionId);
+
+    // Pastikan folder ada
+    if (!fs.existsSync(sessionPath)) {
+      fs.mkdirSync(sessionPath, { recursive: true });
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    const { version } = await fetchLatestBaileysVersion();
     const sock: any = makeWASocket({
       auth: state,
       printQRInTerminal: false,
       logger: pino({ level: 'silent' }),
-      browser: ['Gemini Bot', 'Chrome', '1.0.0'],
+      browser: ['Ubuntu', 'Chrome', ''],
+      version:version,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 0,
+      keepAliveIntervalMs: 10000,
     });
+
     this.sessions.set(sessionId, sock);
-    sock.ev.on('creds.update', saveCreds)
+
+    sock.ev.on('creds.update', saveCreds);
+
     sock.ev.on('connection.update', async (update: Partial<ConnectionState>) => {
       const { connection, lastDisconnect, qr } = update;
 
@@ -77,21 +92,25 @@ export class WhatsappService {
       }
 
       if (connection === 'close') {
-        const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+        const error = lastDisconnect?.error as Boom | Error | undefined;
+        const statusCode = (error as Boom)?.output?.statusCode;
+        const reason = (error as Boom)?.output?.payload?.error || error?.message;
+        this.logger.error(`[${sessionId}] Connection closed. Status: ${statusCode}, Reason: ${reason}`);
+        this.logger.error(`Full error:`, error);
+        this.sessions.delete(sessionId);
+
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
         if (shouldReconnect) {
           const attempts = this.reconnectAttempts.get(sessionId) || 0;
 
-          if (attempts >= 5) {
-            this.logger.error(`[${sessionId}] Max reconnect attempts reached. Stopping.`);
-            this.sessions.delete(sessionId);
-            await fsPromises.rm(sessionPath, {
-              recursive: true,
-              force: true,
-              maxRetries: 3,
-              retryDelay: 100
-            });
+          if (attempts >= 8) {
+            this.logger.error(`[${sessionId}] Max reconnect attempts reached. Cleaning up.`);
+            this.reconnectAttempts.delete(sessionId); // Reset counter
+
+            // Hapus folder karena kemungkinan besar kredensial korup
+            await fsPromises.rm(sessionPath, { recursive: true, force: true }).catch(() => { });
+
             await this.whatsappRepository.update(
               { session: sessionId },
               { status: Status.DISCONNECTED, session_qr: undefined, phone_number: undefined }
@@ -100,29 +119,30 @@ export class WhatsappService {
           }
 
           this.reconnectAttempts.set(sessionId, attempts + 1);
+          const delay = Math.min(1000 * Math.pow(2, attempts), 300000) + Math.random() * 1000;
 
-          const delay = Math.min(1000 * (2 ** attempts), 30000); // Exponential backoff, max 30 detik
-
-          this.logger.warn(`[${sessionId}] Reconnecting in ${delay}ms... (attempt ${attempts + 1})`);
+          this.logger.warn(`[${sessionId}] Reconnecting (Attempt ${attempts + 1}) in ${delay}ms...`);
 
           setTimeout(() => {
             this.createSession(sessionId);
           }, delay);
         } else {
+          // Jika Logged Out (Logout dari HP), hapus permanen
           this.logger.error(`Session ${sessionId} Logged Out`);
-          this.sessions.delete(sessionId);
-          await fsPromises.rm(sessionPath, { recursive: true, force: true }).catch(err => {
-            this.logger.error(`Gagal menghapus folder sesi ${sessionPath}:`, err);
-          });
+          this.reconnectAttempts.delete(sessionId);
+          await fsPromises.rm(sessionPath, { recursive: true, force: true }).catch(() => { });
           await this.whatsappRepository.update(
             { session: sessionId },
             { status: Status.DISCONNECTED, session_qr: undefined, phone_number: undefined }
           );
         }
       } else if (connection === 'open') {
-        const phoneNumber = sock.user.id.split(':')[0].split('@')[0];
-        this.logger.log(`Session ${sessionId} CONNECTED with ${phoneNumber}`);
+        this.logger.log(`Session ${sessionId} CONNECTED`);
 
+        // --- PENTING: Reset attempt saat berhasil konek ---
+        this.reconnectAttempts.set(sessionId, 0);
+
+        const phoneNumber = sock.user.id.split(':')[0].split('@')[0];
         await this.whatsappRepository.update(
           { session: sessionId },
           { status: Status.CONNECTED, session_qr: undefined, phone_number: phoneNumber }
