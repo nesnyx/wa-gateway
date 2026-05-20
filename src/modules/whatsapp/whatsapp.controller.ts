@@ -80,13 +80,10 @@ export class WhatsappController {
       sendMessageDto.target,
       sendMessageDto.message
     );
-
-
   }
 
   @Post("gowa")
   async gowa(@Body() payload: any) {
-    this.logger.log(payload)
     const eventType = payload.event;
     const sessionId = payload.device_id;
     if (eventType !== 'message') {
@@ -94,7 +91,6 @@ export class WhatsappController {
     }
     const senderNumber = payload.payload.from; 
     const incomingMessage = payload.payload.body;
-
     this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
     this.logger.log(`Message ${sessionId} : ${incomingMessage}`)
     await this.sendWhatsappMessage(sessionId, senderNumber, "oke siap");
@@ -103,23 +99,16 @@ export class WhatsappController {
 
   private async sendWhatsappMessage(session: string, to: string, text: string) {
     const url = `${this.gowaBaseURL}/send/message`;
-
-    // Sesuaikan dengan konfigurasi APP_BASIC_AUTH GOWA kamu jika ada
     const config = {
       headers: {
-        // 'Authorization': 'Basic ' + Buffer.from('username:password').toString('base64')
         'Authorization':'Basic '+ Buffer.from('nexisthub:QbGmCsaUW4nfrcg4UtSc4jsVZsqngFX2QAtQJYJhcNr24zpufsL8R6TfrpgoVsa').toString('base64')
       },
-    
     };
-
     const body = {
-      phone: to, // <--- Nomor tujuan (JID dari whatsapp, misal: 628123456789@s.whatsapp.net)
+      phone: to, 
       message: text
     };
-
     try {
- 
       await firstValueFrom(this.httpService.post(url, body, config));
       this.logger.log(`Berhasil membalas pesan ke ${to} menggunakan session ${session}`);
     } catch (error: any) {
