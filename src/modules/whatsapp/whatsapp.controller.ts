@@ -93,9 +93,13 @@ export class WhatsappController {
     }
     const senderNumber = payload.payload.from; 
     const incomingMessage = payload.payload.body;
+    if (payload.device_id === "6289692661125@s.whatsapp.net") {
+      await this.sendWhatsappMessage(sessionId, senderNumber, "oke siap mantapjiwa");
+    } else {
+      await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
+    }
     this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
     this.logger.log(`Message ${sessionId} : ${incomingMessage}`)
-    await this.sendWhatsappMessage(sessionId, senderNumber, "oke siap");
     return { status: 'success' };
   }
 
