@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header, Logger, Headers, UnauthorizedException } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
 import * as QRCode from 'qrcode';
@@ -8,16 +8,18 @@ import { Repository } from 'typeorm';
 import { SendMessageDto } from './dto/send-message.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
+import { verifyWebhookSignature } from 'src/utils/security';
 
 @Controller('whatsapp')
 export class WhatsappController {
   private readonly logger = new Logger();
-  private readonly gowaBaseURL = 'https://app-wa.nexisthub.id';
+  private readonly gowaBaseURL = String(process.env.GOWA_BASEURL);
   constructor(
     @InjectRepository(Whatsapp)
     private whatsappRepository: Repository<Whatsapp>,
     private readonly whatsappService: WhatsappService,
-    private readonly httpService: HttpService) { }
+    private readonly httpService: HttpService,
+  ) { }
 
 
   @Get()
@@ -83,13 +85,16 @@ export class WhatsappController {
   }
 
   @Post("gowa")
-  async gowa(@Body() payload: any) {
+  async gowa(@Body() payload: any, @Headers('x-hub-signature-256') signature: string) {
+    if (!verifyWebhookSignature(payload, signature, String(process.env.GOWA_WEBHOOK_SECRET))) {
+      throw new UnauthorizedException("Unauthorized")
+    }
     const eventType = payload.event;
     const sessionId = payload.device_id;
     if (eventType !== 'message') {
       return { status: 'ignored' };
     }
-    const senderNumber = payload.payload.from; 
+    const senderNumber = payload.payload.from;
     const incomingMessage = payload.payload.body;
     if (payload.device_id === "6289692661125@s.whatsapp.net" || payload.device_id == "bara") {
       await this.sendWhatsappMessage(sessionId, senderNumber, "oke siap mantapjiwa");
@@ -104,11 +109,11 @@ export class WhatsappController {
     const url = `${this.gowaBaseURL}/send/message`;
     const config = {
       headers: {
-        'Authorization':'Basic '+ Buffer.from('nexisthub:QbGmCsaUW4nfrcg4UtSc4jsVZsqngFX2QAtQJYJhcNr24zpufsL8R6TfrpgoVsa').toString('base64')
+        'Authorization': 'Basic ' + Buffer.from(`${process.env.GOWA_USERNAME}:${process.env.GOWA_PASSWORD}`).toString('base64')
       },
     };
     const body = {
-      phone: to, 
+      phone: to,
       message: text
     };
     try {
