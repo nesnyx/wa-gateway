@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header, Logger } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
 import * as QRCode from 'qrcode';
@@ -6,13 +6,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Whatsapp } from './entities/whatsapp.entity';
 import { Repository } from 'typeorm';
 import { SendMessageDto } from './dto/send-message.dto';
+import { firstValueFrom } from 'rxjs';
+import { HttpService } from '@nestjs/axios';
 
 @Controller('whatsapp')
 export class WhatsappController {
+  private readonly logger = new Logger(WhatsappController.name);
+  private readonly gowaBaseURL = 'https://app-wa.nexisthub.id';
   constructor(
     @InjectRepository(Whatsapp)
     private whatsappRepository: Repository<Whatsapp>,
-    private readonly whatsappService: WhatsappService) { }
+    private readonly whatsappService: WhatsappService,
+    private readonly httpService: HttpService) { }
 
 
   @Get()
@@ -79,9 +84,46 @@ export class WhatsappController {
 
   }
 
-  @Get("gowa")
-  async gowa(){
-    return "ok"
+  @Post("gowa")
+  async gowa(@Body() payload: any) {
+    this.logger.log(payload)
+    const eventType = payload.event;
+    const sessionId = payload.session;
+    if (eventType !== 'message') {
+      return { status: 'ignored' };
+    }
+    const senderNumber = payload.data.from; // <--- INI CARA AMBIL NOMOR TELEPONNYA
+    const incomingMessage = payload.data.body;
+
+    this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
+    await this.sendWhatsappMessage(sessionId, senderNumber, "oke siap");
+    return { status: 'success' };
+  }
+
+  private async sendWhatsappMessage(session: string, to: string, text: string) {
+    const url = `${this.gowaBaseURL}/api/v1/messages/send-text`;
+
+    // Sesuaikan dengan konfigurasi APP_BASIC_AUTH GOWA kamu jika ada
+    const config = {
+      headers: {
+        // 'Authorization': 'Basic ' + Buffer.from('username:password').toString('base64')
+      },
+      params: {
+        session: session // <--- Masukkan session di query param sesuai dokumentasi GOWA
+      }
+    };
+
+    const body = {
+      to: to, // <--- Nomor tujuan (JID dari whatsapp, misal: 628123456789@s.whatsapp.net)
+      text: text
+    };
+
+    try {
+      await firstValueFrom(this.httpService.post(url, body, config));
+      this.logger.log(`Berhasil membalas pesan ke ${to} menggunakan session ${session}`);
+    } catch (error: any) {
+      this.logger.error(`Gagal mengirim pesan via GOWA: ${error.message}`);
+    }
   }
 
   @Get("status-sessions")
