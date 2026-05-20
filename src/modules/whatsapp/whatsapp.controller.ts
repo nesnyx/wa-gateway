@@ -120,6 +120,7 @@ export class WhatsappController {
     };
 
     try {
+ 
       await firstValueFrom(this.httpService.post(url, body, config));
       this.logger.log(`Berhasil membalas pesan ke ${to} menggunakan session ${session}`);
     } catch (error: any) {
