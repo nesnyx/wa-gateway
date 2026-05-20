@@ -84,7 +84,8 @@ export class WhatsappController {
 
   @Post("gowa")
   async gowa(@Body() payload: any) {
-    this.logger.log(`Payload : ${payload}`)
+    this.logger.log(payload)
+    console.log(payload)
     const eventType = payload.event;
     const sessionId = payload.device_id;
     if (eventType !== 'message') {
