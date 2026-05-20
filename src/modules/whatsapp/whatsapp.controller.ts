@@ -109,7 +109,7 @@ export class WhatsappController {
     const url = `${this.gowaBaseURL}/send/message`;
     const config = {
       headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${process.env.GOWA_USERNAME}:${process.env.GOWA_PASSWORD}`).toString('base64')
+        'Authorization': 'Basic ' + Buffer.from(`${String(process.env.GOWA_USERNAME)}:${String(process.env.GOWA_PASSWORD)}`).toString('base64')
       },
     };
     const body = {
