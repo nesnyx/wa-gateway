@@ -3,9 +3,9 @@ import { WhatsappService } from './whatsapp.service';
 import { WhatsappController } from './whatsapp.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Whatsapp } from './entities/whatsapp.entity';
-
+import { HttpModule } from '@nestjs/axios';
 @Module({
-  imports: [TypeOrmModule.forFeature([Whatsapp])],
+  imports: [HttpModule,TypeOrmModule.forFeature([Whatsapp])],
   controllers: [WhatsappController],
   providers: [WhatsappService],
   exports: [WhatsappService]
