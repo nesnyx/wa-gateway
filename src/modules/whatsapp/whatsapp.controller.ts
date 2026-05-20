@@ -11,7 +11,7 @@ import { HttpService } from '@nestjs/axios';
 
 @Controller('whatsapp')
 export class WhatsappController {
-  private readonly logger = new Logger(WhatsappController.name);
+  private readonly logger = new Logger();
   private readonly gowaBaseURL = 'https://app-wa.nexisthub.id';
   constructor(
     @InjectRepository(Whatsapp)
