@@ -88,20 +88,21 @@ export class WhatsappController {
   async gowa(@Body() payload: any) {
     this.logger.log(payload)
     const eventType = payload.event;
-    const sessionId = payload.session;
+    const sessionId = payload.device_id;
     if (eventType !== 'message') {
       return { status: 'ignored' };
     }
-    const senderNumber = payload.data.from; // <--- INI CARA AMBIL NOMOR TELEPONNYA
-    const incomingMessage = payload.data.body;
+    const senderNumber = payload.payload.from; 
+    const incomingMessage = payload.payload.body;
 
     this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
+    this.logger.log(`Message ${sessionId} : ${incomingMessage}`)
     await this.sendWhatsappMessage(sessionId, senderNumber, "oke siap");
     return { status: 'success' };
   }
 
   private async sendWhatsappMessage(session: string, to: string, text: string) {
-    const url = `${this.gowaBaseURL}/api/v1/messages/send-text`;
+    const url = `${this.gowaBaseURL}/send/message`;
 
     // Sesuaikan dengan konfigurasi APP_BASIC_AUTH GOWA kamu jika ada
     const config = {
@@ -109,14 +110,12 @@ export class WhatsappController {
         // 'Authorization': 'Basic ' + Buffer.from('username:password').toString('base64')
         'Authorization':'Basic '+ Buffer.from('nexisthub:QbGmCsaUW4nfrcg4UtSc4jsVZsqngFX2QAtQJYJhcNr24zpufsL8R6TfrpgoVsa').toString('base64')
       },
-      params: {
-        session: session // <--- Masukkan session di query param sesuai dokumentasi GOWA
-      }
+    
     };
 
     const body = {
-      to: to, // <--- Nomor tujuan (JID dari whatsapp, misal: 628123456789@s.whatsapp.net)
-      text: text
+      phone: to, // <--- Nomor tujuan (JID dari whatsapp, misal: 628123456789@s.whatsapp.net)
+      message: text
     };
 
     try {
