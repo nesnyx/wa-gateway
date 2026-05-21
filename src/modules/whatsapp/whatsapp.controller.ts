@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header, Logger, Headers, UnauthorizedException } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
-import * as QRCode from 'qrcode';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Whatsapp } from './entities/whatsapp.entity';
 import { Repository } from 'typeorm';
@@ -16,73 +15,25 @@ export class WhatsappController {
   private readonly gowaBaseURL = String(process.env.GOWA_BASEURL);
   constructor(
     @InjectRepository(Whatsapp)
-    private whatsappRepository: Repository<Whatsapp>,
     private readonly whatsappService: WhatsappService,
     private readonly httpService: HttpService,
   ) { }
 
-
-  @Get()
-  async findAll() {
-    return await this.whatsappService.findAll()
+  @Post('devices')
+  async createDevice(@Body() payload: CreateWhatsappDto) {
+    return await this.whatsappService.createDevice(payload.session);
   }
 
-  @Post("generated-qr")
-  async create(@Body() createWhatsappDto: CreateWhatsappDto) {
-    let session = await this.whatsappRepository.findOneBy({ session: createWhatsappDto.session });
-
-    if (session && session.status === 'CONNECTED') {
-      return {
-        message: 'Session already connected',
-        sessionId: session.session,
-        status: session.status,
-      };
-    }
-    if (!session) {
-      session = this.whatsappRepository.create({ session: createWhatsappDto.session });
-      await this.whatsappRepository.save(session);
-    }
-    await this.whatsappService.createSession(session.session);
-
-    return {
-      message: 'Initializing session...',
-      sessionId: session,
-    };
+  @Get("status")
+  async status(@Headers('X-Device-Id') deviceId: string) {
+    return await this.whatsappService.checkDevice(deviceId, 'status')
   }
 
-  @Get('status/:sessionId')
-  async getStatus(@Param('sessionId') sessionId: string) {
-    const session = await this.whatsappService.findOneBySessionId(sessionId);
-    if (!session) return { message: 'Session not found' };
-    return {
-      status: session.status,
-      qr: session.session_qr,
-      phoneNumber: session.phone_number
-    };
+  @Post("login-with-code")
+  async loginWithCode(@Headers('X-Device-Id') deviceId: string, @Body() phone: string) {
+    return await this.whatsappService.loginWithCode(deviceId, phone)
   }
 
-  @Get('qr/:sessionId')
-  @Header('Content-Type', 'image/png')
-  async getQr(@Param('sessionId') sessionId: string) {
-    const session = await this.whatsappService.findOneBySessionId(sessionId);
-    if (!session) return { message: 'Session not found' };
-    const qrBuffer = await QRCode.toBuffer(session.session_qr, {
-      errorCorrectionLevel: 'H',
-      margin: 4,
-      scale: 10
-    });
-    return new StreamableFile(qrBuffer);
-  }
-
-
-  @Post("send-message")
-  async sendMessage(@Body() sendMessageDto: SendMessageDto) {
-    return await this.whatsappService.sendMessage(
-      sendMessageDto.sessionId,
-      sendMessageDto.target,
-      sendMessageDto.message
-    );
-  }
 
   @Post("gowa")
   async gowa(@Body() payload: any, @Headers('x-hub-signature-256') signature: string) {
@@ -122,15 +73,6 @@ export class WhatsappController {
     } catch (error: any) {
       this.logger.error(`Gagal mengirim pesan via GOWA: ${error.message}`);
     }
-  }
-
-  @Get("status-sessions")
-  async statusSessions() {
-    return await this.whatsappService.statusSessions();
-  }
-  @Get(":sessionId")
-  async findBySession(@Param('sessionId') sessionId: string) {
-    return await this.whatsappService.findOneBySessionId(sessionId)
   }
 
 

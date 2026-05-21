@@ -4,5 +4,5 @@ export class CreateWhatsappDto {
 
     @IsString()
     @IsNotEmpty()
-    session: string;
+    session!: string;
 }

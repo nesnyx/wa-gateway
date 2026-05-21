@@ -11,24 +11,24 @@ export enum Status {
 export class Whatsapp {
 
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column()
-    session: string;
+    session!: string;
 
     @Column({ nullable: true })
-    session_qr: string;
+    session_qr!: string;
 
     @Column({ nullable: true })
-    phone_number: string;
+    phone_number!: string;
 
     @Column({ default: Status.PENDING })
-    status: string
+    status!: string
 
     @CreateDateColumn()
-    created_at: Date;
+    created_at!: Date;
 
     @UpdateDateColumn()
-    updated_at: Date;
+    updated_at!: Date;
 
 }
