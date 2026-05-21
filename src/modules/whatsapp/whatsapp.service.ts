@@ -9,6 +9,7 @@ import { first, firstValueFrom } from 'rxjs';
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private readonly gowaBaseUrl = String(process.env.GOWA_BASEURL)
+  private readonly authorization = 'Basic ' + Buffer.from(`${String(process.env.GOWA_USERNAME)}:${String(process.env.GOWA_PASSWORD)}`).toString('base64')
   constructor(
     @InjectRepository(Whatsapp)
     private whatsappRepository: Repository<Whatsapp>,
@@ -30,6 +31,10 @@ export class WhatsappService {
   }
 
   async createDevice(session: string) {
+    const headers = {
+      'Authorization':this.authorization
+    }
+    
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -40,15 +45,15 @@ export class WhatsappService {
       })
       await queryRunner.commitTransaction();
       const apiResponse = await firstValueFrom(
-        this.httpService.post(`${this.gowaBaseUrl}/devices`, {
+        this.httpService.post(`${this.gowaBaseUrl}/devices`,{
           device_id: session
-        })
+        },{headers} )
       )
       this.logger.log(`Membuat Device baru ${session}`)
       return apiResponse
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
-      await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${session}`))
+      await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${session}`,{headers}))
       this.logger.error(error.message)
       throw new InternalServerErrorException('Transaksi gagal, data disinkronkan kembali.');
     } finally {
@@ -58,7 +63,8 @@ export class WhatsappService {
 
   async checkDevice(deviceId: string, type: string) {
     const headers = {
-      'X-Device-Id': deviceId
+      'X-Device-Id': deviceId,
+      'Authorization':this.authorization
     }
     try {
       await this.findDeviceId(deviceId)
@@ -81,7 +87,8 @@ export class WhatsappService {
 
   async loginWithCode(deviceId: string, phone: string) {
      const headers = {
-      'X-Device-Id': deviceId
+      'X-Device-Id': deviceId,
+      
     }
     try {
       await this.findDeviceId(deviceId)
@@ -92,9 +99,13 @@ export class WhatsappService {
   }
 
   async removeDevice(deviceId: string) {
+     const headers = {
+      'X-Device-Id': deviceId,
+      
+    }
     try {
       await this.findDeviceId(deviceId)
-      return await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`))
+      return await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`,{headers}))
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Remove : ", error.message)
     }

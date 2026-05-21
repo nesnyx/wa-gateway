@@ -3,8 +3,6 @@ import { WhatsappService } from './whatsapp.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Whatsapp } from './entities/whatsapp.entity';
-import { Repository } from 'typeorm';
-import { SendMessageDto } from './dto/send-message.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { verifyWebhookSignature } from 'src/utils/security';
