@@ -13,7 +13,6 @@ export class WhatsappService {
   constructor(
     @InjectRepository(Whatsapp)
     private whatsappRepository: Repository<Whatsapp>,
-    private dataSource: DataSource,
     private httpService: HttpService,
   ) { }
 
@@ -32,13 +31,9 @@ export class WhatsappService {
 
   async createDevice(session: string) {
     const headers = { Authorization: this.authorization };
-
-    // 1. Simpan dulu (bisa tanpa transaksi jika hanya satu entity)
     const device = this.whatsappRepository.create({ session });
     await this.whatsappRepository.save(device);
-
     try {
-      // 2. Panggil API eksternal
       const apiResponse = await firstValueFrom(
         this.httpService.post(`${this.gowaBaseUrl}/devices`, {
           device_id: session,
@@ -47,7 +42,6 @@ export class WhatsappService {
       this.logger.log(`Membuat Device baru ${session}`);
       return apiResponse.data;
     } catch (error: any) {
-      // 3. Rollback bisnis: hapus device dari database
       await this.whatsappRepository.delete({ session });
       this.logger.error(`Gagal mendaftarkan device ke Gowa: ${error.message}`);
       throw new InternalServerErrorException('Transaksi gagal, data disinkronkan kembali.');
@@ -81,8 +75,8 @@ export class WhatsappService {
 
   async loginWithCode(deviceId: string, phone: string) {
     const headers = {
+      'Authorization': this.authorization,
       'X-Device-Id': deviceId,
-
     }
     try {
       await this.findDeviceId(deviceId)
@@ -95,6 +89,7 @@ export class WhatsappService {
 
   async removeDevice(deviceId: string) {
     const headers = {
+      'Authorization': this.authorization,
       'X-Device-Id': deviceId,
 
     }
