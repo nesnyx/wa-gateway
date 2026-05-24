@@ -24,7 +24,7 @@ export class WhatsappController {
     return await this.whatsappService.checkDevice(deviceId, 'status')
   }
 
-  @Post("login-with-code")
+  @Get("login-with-code")
   async loginWithCode(@Headers('X-Device-Id') deviceId: string, @Body() phone: string) {
     return await this.whatsappService.loginWithCode(deviceId, phone)
   }
