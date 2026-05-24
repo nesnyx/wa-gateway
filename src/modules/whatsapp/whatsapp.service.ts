@@ -50,7 +50,7 @@ export class WhatsappService {
         },{headers} )
       )
       this.logger.log(`Membuat Device baru ${session}`)
-      return apiResponse
+      return apiResponse.data
     } catch (error: any) {
       await queryRunner.rollbackTransaction();
       await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${session}`,{headers}))
@@ -69,9 +69,10 @@ export class WhatsappService {
     try {
       await this.findDeviceId(deviceId)
       if (type == "status") {
-        return await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/devices/${deviceId}`, {
+        const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/devices/${deviceId}`, {
           headers
         }))
+        return apiResponse.data
       } else if (type == "connection") {
 
         return await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/devices/${deviceId}`, {
@@ -92,7 +93,8 @@ export class WhatsappService {
     }
     try {
       await this.findDeviceId(deviceId)
-      return await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/login-with-code?phone=${phone}`,{headers}))
+      const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/login-with-code?phone=${phone}`,{headers}))
+      return apiResponse.data
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Login with code : ", error.message)
     }
@@ -105,7 +107,8 @@ export class WhatsappService {
     }
     try {
       await this.findDeviceId(deviceId)
-      return await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`,{headers}))
+      const apiResponse = await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`,{headers}))
+      return apiResponse.data
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Remove : ", error.message)
     }
