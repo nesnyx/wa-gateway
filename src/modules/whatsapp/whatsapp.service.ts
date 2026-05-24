@@ -31,40 +31,43 @@ export class WhatsappService {
   }
 
   async createDevice(session: string) {
-    const headers = {
-      'Authorization':this.authorization
-    }
-    console.log(this.authorization)
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    let createDevice: any;
+    const headers = { Authorization: this.authorization };
+
     try {
-      createDevice = await queryRunner.manager.save(Whatsapp, {
-        session: session
-      })
-      await queryRunner.commitTransaction();
+      // Gunakan transaksi otomatis
+      await this.dataSource.transaction(async (manager) => {
+        await manager.save(Whatsapp, { session });
+      });
+
+      // API call dilakukan di LUAR transaksi database
       const apiResponse = await firstValueFrom(
-        this.httpService.post(`${this.gowaBaseUrl}/devices`,{
-          device_id: session
-        },{headers} )
-      )
-      this.logger.log(`Membuat Device baru ${session}`)
-      return apiResponse.data
-    } catch (error: any) {
-      await queryRunner.rollbackTransaction();
-      await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${session}`,{headers}))
-      this.logger.error(error.message)
+        this.httpService.post(`${this.gowaBaseUrl}/devices`, {
+          device_id: session,
+        }, { headers }),
+      );
+
+      this.logger.log(`Membuat Device baru ${session}`);
+      return apiResponse.data;
+    } catch (error : any) {
+      // Jika API gagal, lakukan kompensasi (hapus record database)
+      // Jangan di dalam transaksi, karena API call bisa gagal setelah transaksi sukses
+      this.logger.error(error.message);
+
+      // Hapus record yang sudah terlanjur tersimpan (kalau memang tersimpan)
+      try {
+        await this.whatsappRepository.delete({ session });
+      } catch (deleteError) {
+        this.logger.error('Gagal menghapus device setelah rollback', deleteError);
+      }
+
       throw new InternalServerErrorException('Transaksi gagal, data disinkronkan kembali.');
-    } finally {
-      await queryRunner.release();
     }
   }
 
   async checkDevice(deviceId: string, type: string) {
     const headers = {
       'X-Device-Id': deviceId,
-      'Authorization':this.authorization
+      'Authorization': this.authorization
     }
     try {
       await this.findDeviceId(deviceId)
@@ -87,13 +90,13 @@ export class WhatsappService {
   }
 
   async loginWithCode(deviceId: string, phone: string) {
-     const headers = {
+    const headers = {
       'X-Device-Id': deviceId,
-      
+
     }
     try {
       await this.findDeviceId(deviceId)
-      const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/login-with-code?phone=${phone}`,{headers}))
+      const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/login-with-code?phone=${phone}`, { headers }))
       return apiResponse.data
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Login with code : ", error.message)
@@ -101,13 +104,13 @@ export class WhatsappService {
   }
 
   async removeDevice(deviceId: string) {
-     const headers = {
+    const headers = {
       'X-Device-Id': deviceId,
-      
+
     }
     try {
       await this.findDeviceId(deviceId)
-      const apiResponse = await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`,{headers}))
+      const apiResponse = await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`, { headers }))
       return apiResponse.data
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Remove : ", error.message)
