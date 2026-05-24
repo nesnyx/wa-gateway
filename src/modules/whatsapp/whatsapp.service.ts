@@ -34,7 +34,7 @@ export class WhatsappService {
     const headers = {
       'Authorization':this.authorization
     }
-    
+    console.log(this.authorization)
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
