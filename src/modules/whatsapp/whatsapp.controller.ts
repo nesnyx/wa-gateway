@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header, Logger, Headers, UnauthorizedException } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
-import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
+import { CreateWhatsappDto,LoginWhatsappDto } from './dto/create-whatsapp.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 
@@ -25,8 +25,8 @@ export class WhatsappController {
   }
 
   @Get("login-with-code")
-  async loginWithCode(@Headers('X-Device-Id') deviceId: string, @Body() phone: string) {
-    return await this.whatsappService.loginWithCode(deviceId, phone)
+  async loginWithCode(@Headers('X-Device-Id') deviceId: string, @Body() payload: LoginWhatsappDto) {
+    return await this.whatsappService.loginWithCode(deviceId, String(payload.phone))
   }
 
 
