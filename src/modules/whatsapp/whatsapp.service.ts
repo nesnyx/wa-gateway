@@ -33,33 +33,23 @@ export class WhatsappService {
   async createDevice(session: string) {
     const headers = { Authorization: this.authorization };
 
-    try {
-      // Gunakan transaksi otomatis
-      await this.dataSource.transaction(async (manager) => {
-        await manager.save(Whatsapp, { session });
-      });
+    // 1. Simpan dulu (bisa tanpa transaksi jika hanya satu entity)
+    const device = this.whatsappRepository.create({ session });
+    await this.whatsappRepository.save(device);
 
-      // API call dilakukan di LUAR transaksi database
+    try {
+      // 2. Panggil API eksternal
       const apiResponse = await firstValueFrom(
         this.httpService.post(`${this.gowaBaseUrl}/devices`, {
           device_id: session,
         }, { headers }),
       );
-
       this.logger.log(`Membuat Device baru ${session}`);
       return apiResponse.data;
-    } catch (error : any) {
-      // Jika API gagal, lakukan kompensasi (hapus record database)
-      // Jangan di dalam transaksi, karena API call bisa gagal setelah transaksi sukses
-      this.logger.error(error.message);
-
-      // Hapus record yang sudah terlanjur tersimpan (kalau memang tersimpan)
-      try {
-        await this.whatsappRepository.delete({ session });
-      } catch (deleteError) {
-        this.logger.error('Gagal menghapus device setelah rollback', deleteError);
-      }
-
+    } catch (error: any) {
+      // 3. Rollback bisnis: hapus device dari database
+      await this.whatsappRepository.delete({ session });
+      this.logger.error(`Gagal mendaftarkan device ke Gowa: ${error.message}`);
       throw new InternalServerErrorException('Transaksi gagal, data disinkronkan kembali.');
     }
   }
