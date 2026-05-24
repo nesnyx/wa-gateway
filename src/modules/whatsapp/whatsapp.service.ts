@@ -84,6 +84,7 @@ export class WhatsappService {
       console.log(apiResponse)
       return apiResponse.data
     } catch (error: any) {
+      console.log(error)
       throw new BadRequestException("Something Wrong with Login with code : ", error.message)
     }
   }
