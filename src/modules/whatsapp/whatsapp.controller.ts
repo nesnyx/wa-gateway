@@ -1,18 +1,15 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header, Logger, Headers, UnauthorizedException } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { CreateWhatsappDto } from './dto/create-whatsapp.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Whatsapp } from './entities/whatsapp.entity';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
-import { verifyWebhookSignature } from 'src/utils/security';
+
 
 @Controller('whatsapp')
 export class WhatsappController {
   private readonly logger = new Logger();
   private readonly gowaBaseURL = String(process.env.GOWA_BASEURL);
   constructor(
-    @InjectRepository(Whatsapp)
     private readonly whatsappService: WhatsappService,
     private readonly httpService: HttpService,
   ) { }
