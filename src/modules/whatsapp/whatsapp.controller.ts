@@ -34,31 +34,28 @@ export class WhatsappController {
 
 
   @Post("gowa")
-  async gowa(@Body() payload: any, @Headers('x-hub-signature-256') signature: string) {
-    if (!verifyWebhookSignature(payload, signature, String(process.env.GOWA_WEBHOOK_SECRET))) {
-      throw new UnauthorizedException("Unauthorized")
-    }
+  async gowa(@Body() payload: any,@Headers('X-Device-Id') deviceId: string) {
+    // if (!verifyWebhookSignature(payload, signature, String(process.env.GOWA_WEBHOOK_SECRET))) {
+    //   throw new UnauthorizedException("Unauthorized")
+    // }
     const eventType = payload.event;
-    const sessionId = payload.device_id;
+    const sessionId = deviceId
     if (eventType !== 'message') {
       return { status: 'ignored' };
     }
     const senderNumber = payload.payload.from;
     const incomingMessage = payload.payload.body;
-    if (payload.device_id === "6289692661125@s.whatsapp.net" || payload.device_id == "bara") {
-      await this.sendWhatsappMessage(sessionId, senderNumber, "oke siap mantapjiwa");
-    }
     this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
-    this.logger.log(`Message ${sessionId} : ${incomingMessage}`)
+    this.logger.log(`Message ${sessionId} : ${incomingMessage}`);
     await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
     return { status: 'success' };
   }
-
   private async sendWhatsappMessage(session: string, to: string, text: string) {
     const url = `${this.gowaBaseURL}/send/message`;
     const config = {
       headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${String(process.env.GOWA_USERNAME)}:${String(process.env.GOWA_PASSWORD)}`).toString('base64')
+        'Authorization': 'Basic ' + Buffer.from(`${String(process.env.GOWA_USERNAME)}:${String(process.env.GOWA_PASSWORD)}`).toString('base64'),
+        'X-Device-Id':session
       },
     };
     const body = {
