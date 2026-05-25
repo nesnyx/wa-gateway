@@ -83,7 +83,6 @@ export class WhatsappService {
       const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/login-with-code?phone=${phone}`, { headers }))
       return apiResponse.data
     } catch (error: any) {
-
       throw new BadRequestException("Something Wrong with Login with code : ", error.message)
     }
   }
