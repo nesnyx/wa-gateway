@@ -80,7 +80,6 @@ export class WhatsappController {
     return await this.whatsappService.removeDevice(deviceId)
   }
 
-
   @Post("logout")
   async logout(@Headers('X-Device-Id') deviceId: string) {
     return await this.whatsappService.logoutWhatsapp(deviceId)

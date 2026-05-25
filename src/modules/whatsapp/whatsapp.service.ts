@@ -94,7 +94,7 @@ export class WhatsappService {
     }
     try {
       await this.findDeviceId(deviceId)
-      const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/devices/${deviceId}/logout`, { headers }))
+      const apiResponse = await firstValueFrom(this.httpService.post(`${this.gowaBaseUrl}/devices/${deviceId}/logout`, { headers }))
       return apiResponse.data
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Logout : ", error.message)
