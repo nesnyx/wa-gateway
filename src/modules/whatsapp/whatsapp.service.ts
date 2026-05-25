@@ -18,17 +18,7 @@ export class WhatsappService {
   ) { }
 
 
-  private async findDeviceId(deviceId: string) {
-    const existing = await this.whatsappRepository.findOne({
-      where: {
-        session: deviceId
-      }
-    })
-    if (!existing) {
-      throw new NotFoundException(`Device ID ${deviceId} not found`)
-    }
-    return existing
-  }
+
 
   async createDevice(session: string) {
     const headers = { Authorization: this.authorization };
@@ -95,6 +85,7 @@ export class WhatsappService {
       const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/login-with-code?phone=${phone}`, { headers }))
       return apiResponse.data
     } catch (error: any) {
+
       throw new BadRequestException("Something Wrong with Login with code : ", error.message)
     }
   }
@@ -109,6 +100,7 @@ export class WhatsappService {
       const apiResponse = await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`, { headers }))
       return apiResponse.data
     } catch (error: any) {
+      console.log(error)
       throw new BadRequestException("Something Wrong with Remove : ", error.message)
     }
   }
@@ -140,12 +132,24 @@ export class WhatsappService {
       message: text
     };
     try {
-      const apiResponse=await firstValueFrom(this.httpService.post(url, body, config));
+      const apiResponse = await firstValueFrom(this.httpService.post(url, body, config));
       this.logger.log(`Berhasil membalas pesan ke ${to} menggunakan session ${session}`);
       return apiResponse.data
     } catch (error: any) {
       this.logger.error(`Gagal mengirim pesan via GOWA: ${error.message}`);
       throw new BadRequestException("Something Wrong Send Message Webhook")
     }
+  }
+
+  async findDeviceId(deviceId: string) {
+    const existing = await this.whatsappRepository.findOne({
+      where: {
+        session: deviceId
+      }
+    })
+    if (!existing) {
+      throw new NotFoundException(`Device ID ${deviceId} not found`)
+    }
+    return existing
   }
 }

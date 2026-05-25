@@ -33,6 +33,11 @@ export class WhatsappController {
     // }
     return await this.whatsappService.webhookSendMessage(payload,deviceId)
   }
+
+  @Delete("devices")
+  async removeDevice(@Headers('X-Device-Id') deviceId: string){
+    return await this.whatsappService.removeDevice(deviceId)
+  }
   
 
 
