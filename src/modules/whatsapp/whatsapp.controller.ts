@@ -46,8 +46,8 @@ export class WhatsappController {
     const incomingMessage = payload.payload.body;
     this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
     this.logger.log(`Message ${sessionId} : ${incomingMessage}`);
-    const sendMessage = await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
-    return sendMessage
+    await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
+    return { status: 'success' };
   }
 
   private async sendWhatsappMessage(session: string, to: string, text: string) {
