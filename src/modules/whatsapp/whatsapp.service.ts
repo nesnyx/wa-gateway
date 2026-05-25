@@ -87,14 +87,14 @@ export class WhatsappService {
     }
   }
 
-  async logoutWhatsaap(deviceId: string) {
+ 
+  async logoutDevices(deviceId: string) {
     const headers = {
       'Authorization': this.authorization,
-      'X-Device-Id': deviceId,
     }
     try {
       await this.findDeviceId(deviceId)
-      const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/logout`, { headers }))
+      const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/devices/${deviceId}/logout`, { headers }))
       return apiResponse.data
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Logout : ", error.message)
@@ -165,7 +165,7 @@ export class WhatsappService {
     return existing
   }
 
-  async logoutDevice(deviceId: string) {
+  async logoutWhatsapp(deviceId: string) {
     const config = {
       headers: {
         'Authorization': this.authorization,

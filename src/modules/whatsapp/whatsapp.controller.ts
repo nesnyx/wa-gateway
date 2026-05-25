@@ -31,7 +31,7 @@ export class WhatsappController {
   }
 
 
-  @Post("gowa")
+  @Post("webhook")
   async gowa(@Body() payload: any) {
     console.log(payload)
     try {
@@ -83,7 +83,12 @@ export class WhatsappController {
 
   @Post("logout")
   async logout(@Headers('X-Device-Id') deviceId: string) {
-    return await this.whatsappService.logoutDevice(deviceId)
+    return await this.whatsappService.logoutWhatsapp(deviceId)
+  }
+
+  @Post("devices/logout")
+  async logoutDevices(@Headers('X-Device-Id') deviceId: string) {
+    return await this.whatsappService.logoutDevices(deviceId)
   }
 
 
