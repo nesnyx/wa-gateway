@@ -41,8 +41,6 @@ export class WhatsappService {
       this.logger.log(`Membuat Device baru ${session}`);
       return apiResponse.data;
     } catch (error: any) {
-      console.log(error)
-      await this.whatsappRepository.delete({ session });
       await this.removeDevice(session)
       this.logger.error(`Gagal mendaftarkan device ke Gowa: ${error.message}`);
       throw new InternalServerErrorException('Something Wrong with Create Device');
@@ -90,6 +88,20 @@ export class WhatsappService {
     }
   }
 
+  async logoutWhatsaap(deviceId: string) {
+    const headers = {
+      'Authorization': this.authorization,
+      'X-Device-Id': deviceId,
+    }
+    try {
+      await this.findDeviceId(deviceId)
+      const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/logout`, { headers }))
+      return apiResponse.data
+    } catch (error: any) {
+      throw new BadRequestException("Something Wrong with Logout : ", error.message)
+    }
+  }
+
   async removeDevice(deviceId: string) {
     const headers = {
       'Authorization': this.authorization,
@@ -97,10 +109,10 @@ export class WhatsappService {
     }
     try {
       await this.findDeviceId(deviceId)
+      await this.whatsappRepository.delete({ session: deviceId });
       const apiResponse = await firstValueFrom(this.httpService.delete(`${this.gowaBaseUrl}/devices/${deviceId}`, { headers }))
       return apiResponse.data
     } catch (error: any) {
-      console.log(error)
       throw new BadRequestException("Something Wrong with Remove : ", error.message)
     }
   }
