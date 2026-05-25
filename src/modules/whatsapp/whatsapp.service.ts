@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Status, Whatsapp } from './entities/whatsapp.entity';
 import { DataSource, Repository } from 'typeorm';
@@ -9,6 +9,7 @@ import { first, firstValueFrom } from 'rxjs';
 export class WhatsappService {
   private readonly logger = new Logger(WhatsappService.name);
   private readonly gowaBaseUrl = String(process.env.GOWA_BASEURL)
+
   private readonly authorization = 'Basic ' + Buffer.from(`${String(process.env.GOWA_USERNAME)}:${String(process.env.GOWA_PASSWORD)}`).toString('base64')
   constructor(
     @InjectRepository(Whatsapp)
@@ -31,9 +32,17 @@ export class WhatsappService {
 
   async createDevice(session: string) {
     const headers = { Authorization: this.authorization };
-    const device = this.whatsappRepository.create({ session });
-    await this.whatsappRepository.save(device);
     try {
+      const existingDevice = await this.whatsappRepository.findOne({
+        where: {
+          session
+        }
+      })
+      if (existingDevice) {
+        throw new ConflictException("Duplicated device use another name!")
+      }
+      const device = this.whatsappRepository.create({ session });
+      await this.whatsappRepository.save(device);
       const apiResponse = await firstValueFrom(
         this.httpService.post(`${this.gowaBaseUrl}/devices`, {
           device_id: session,
@@ -42,9 +51,11 @@ export class WhatsappService {
       this.logger.log(`Membuat Device baru ${session}`);
       return apiResponse.data;
     } catch (error: any) {
+      console.log(error)
       await this.whatsappRepository.delete({ session });
+      await this.removeDevice(session)
       this.logger.error(`Gagal mendaftarkan device ke Gowa: ${error.message}`);
-      throw new InternalServerErrorException('Transaksi gagal, data disinkronkan kembali.');
+      throw new InternalServerErrorException('Something Wrong with Create Device');
     }
   }
 
@@ -68,8 +79,9 @@ export class WhatsappService {
       } else {
         return
       }
-    } catch (error : any) {
-      throw new BadRequestException("Something Wrong with Check Status Device : ",error.message)
+    } catch (error: any) {
+      console.log(error)
+      throw new BadRequestException("Something Wrong with Check Status Device : ", error.message)
     }
   }
 
@@ -91,7 +103,6 @@ export class WhatsappService {
     const headers = {
       'Authorization': this.authorization,
       'X-Device-Id': deviceId,
-
     }
     try {
       await this.findDeviceId(deviceId)
@@ -99,6 +110,42 @@ export class WhatsappService {
       return apiResponse.data
     } catch (error: any) {
       throw new BadRequestException("Something Wrong with Remove : ", error.message)
+    }
+  }
+
+  async webhookSendMessage(payload: any, deviceId: string) {
+    const eventType = payload.event;
+    const sessionId = deviceId
+    if (eventType !== 'message') {
+      return { status: 'ignored' };
+    }
+    const senderNumber = payload.payload.from;
+    const incomingMessage = payload.payload.body;
+    this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
+    this.logger.log(`Message ${sessionId} : ${incomingMessage}`);
+    const sendMessage = await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
+    return sendMessage
+  }
+
+  private async sendWhatsappMessage(session: string, to: string, text: string) {
+    const url = `${this.gowaBaseUrl}/send/message`;
+    const config = {
+      headers: {
+        'Authorization': this.authorization,
+        'X-Device-Id': session
+      },
+    };
+    const body = {
+      phone: to,
+      message: text
+    };
+    try {
+      const apiResponse=await firstValueFrom(this.httpService.post(url, body, config));
+      this.logger.log(`Berhasil membalas pesan ke ${to} menggunakan session ${session}`);
+      return apiResponse.data
+    } catch (error: any) {
+      this.logger.error(`Gagal mengirim pesan via GOWA: ${error.message}`);
+      throw new BadRequestException("Something Wrong Send Message Webhook")
     }
   }
 }

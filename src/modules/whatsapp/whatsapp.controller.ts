@@ -1,17 +1,13 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, StreamableFile, Header, Logger, Headers, UnauthorizedException } from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { CreateWhatsappDto,LoginWhatsappDto } from './dto/create-whatsapp.dto';
-import { firstValueFrom } from 'rxjs';
-import { HttpService } from '@nestjs/axios';
 
 
 @Controller('whatsapp')
 export class WhatsappController {
-  private readonly logger = new Logger();
-  private readonly gowaBaseURL = String(process.env.GOWA_BASEURL);
+  
   constructor(
-    private readonly whatsappService: WhatsappService,
-    private readonly httpService: HttpService,
+    private readonly whatsappService: WhatsappService
   ) { }
 
   @Post('devices')
@@ -35,37 +31,9 @@ export class WhatsappController {
     // if (!verifyWebhookSignature(payload, signature, String(process.env.GOWA_WEBHOOK_SECRET))) {
     //   throw new UnauthorizedException("Unauthorized")
     // }
-    const eventType = payload.event;
-    const sessionId = deviceId
-    if (eventType !== 'message') {
-      return { status: 'ignored' };
-    }
-    const senderNumber = payload.payload.from;
-    const incomingMessage = payload.payload.body;
-    this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
-    this.logger.log(`Message ${sessionId} : ${incomingMessage}`);
-    await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
-    return { status: 'success' };
+    return await this.whatsappService.webhookSendMessage(payload,deviceId)
   }
-  private async sendWhatsappMessage(session: string, to: string, text: string) {
-    const url = `${this.gowaBaseURL}/send/message`;
-    const config = {
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${String(process.env.GOWA_USERNAME)}:${String(process.env.GOWA_PASSWORD)}`).toString('base64'),
-        'X-Device-Id':session
-      },
-    };
-    const body = {
-      phone: to,
-      message: text
-    };
-    try {
-      await firstValueFrom(this.httpService.post(url, body, config));
-      this.logger.log(`Berhasil membalas pesan ke ${to} menggunakan session ${session}`);
-    } catch (error: any) {
-      this.logger.error(`Gagal mengirim pesan via GOWA: ${error.message}`);
-    }
-  }
+  
 
 
 }
