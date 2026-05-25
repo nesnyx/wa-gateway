@@ -50,8 +50,8 @@ export class WhatsappService {
 
   async checkDevice(deviceId: string, type: string) {
     const headers = {
-      'X-Device-Id': deviceId,
-      'Authorization': this.authorization
+      'Authorization': this.authorization,
+      'X-Device-Id': deviceId
     }
     try {
       await this.findDeviceId(deviceId)
@@ -68,8 +68,8 @@ export class WhatsappService {
       } else {
         return
       }
-    } catch (error) {
-      throw new BadRequestException("Something Wrong with Check Status Device")
+    } catch (error : any) {
+      throw new BadRequestException("Something Wrong with Check Status Device : ",error.message)
     }
   }
 
@@ -81,10 +81,8 @@ export class WhatsappService {
     try {
       await this.findDeviceId(deviceId)
       const apiResponse = await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/login-with-code?phone=${phone}`, { headers }))
-      console.log(apiResponse)
       return apiResponse.data
     } catch (error: any) {
-      console.log(error)
       throw new BadRequestException("Something Wrong with Login with code : ", error.message)
     }
   }
