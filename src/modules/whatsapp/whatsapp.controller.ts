@@ -9,11 +9,10 @@ import { HttpService } from '@nestjs/axios';
 export class WhatsappController {
   private readonly logger = new Logger();
   private readonly gowaBaseUrl = String(process.env.GOWA_BASEURL)
-
   private readonly authorization = 'Basic ' + Buffer.from(`${String(process.env.GOWA_USERNAME)}:${String(process.env.GOWA_PASSWORD)}`).toString('base64')
   constructor(
     private readonly whatsappService: WhatsappService,
-    private readonly httpService : HttpService
+    private readonly httpService: HttpService
   ) { }
 
   @Post('devices')
@@ -33,13 +32,13 @@ export class WhatsappController {
 
 
   @Post("gowa")
-  async gowa(@Body() payload: any, @Headers('X-Device-Id') deviceId: string) {
+  async gowa(@Body() payload: any) {
     console.log(payload)
     // if (!verifyWebhookSignature(payload, signature, String(process.env.GOWA_WEBHOOK_SECRET))) {
     //   throw new UnauthorizedException("Unauthorized")
     // }
     const eventType = payload.event;
-    const sessionId = deviceId
+    const sessionId = payload.device_id
     if (eventType !== 'message') {
       return { status: 'ignored' };
     }
@@ -51,18 +50,11 @@ export class WhatsappController {
     return sendMessage
   }
 
-  @Delete("devices")
-  async removeDevice(@Headers('X-Device-Id') deviceId: string) {
-    return await this.whatsappService.removeDevice(deviceId)
-  }
-
-
   private async sendWhatsappMessage(session: string, to: string, text: string) {
     const url = `${this.gowaBaseUrl}/send/message`;
     const config = {
       headers: {
         'Authorization': this.authorization,
-        'X-Device-Id': session
       },
     };
     const body = {
@@ -78,6 +70,16 @@ export class WhatsappController {
       throw new BadRequestException("Something Wrong Send Message Webhook")
     }
   }
+
+
+
+  @Delete("devices")
+  async removeDevice(@Headers('X-Device-Id') deviceId: string) {
+    return await this.whatsappService.removeDevice(deviceId)
+  }
+
+
+
 
 
 
