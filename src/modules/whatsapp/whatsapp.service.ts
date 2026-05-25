@@ -117,6 +117,7 @@ export class WhatsappService {
   }
 
   async webhookSendMessage(payload: any, deviceId: string) {
+    console.log(payload)
     const eventType = payload.event;
     const sessionId = deviceId
     if (eventType !== 'message') {
