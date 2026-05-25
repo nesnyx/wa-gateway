@@ -34,17 +34,21 @@ export class WhatsappController {
   @Post("gowa")
   async gowa(@Body() payload: any) {
     console.log(payload)
-    const eventType = payload.event;
-    const sessionId = payload.device_id
-    if (eventType !== 'message') {
-      return { status: 'ignored' };
+    try {
+      const eventType = payload.event;
+      const sessionId = payload.device_id
+      if (eventType !== 'message') {
+        return { status: 'ignored' };
+      }
+      const senderNumber = payload.payload.from;
+      const incomingMessage = payload.payload.body;
+      this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
+      this.logger.log(`Message ${sessionId} : ${incomingMessage}`);
+      await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
+      return { status: 'success' };
+    } catch (error) {
+      console.log(error)
     }
-    const senderNumber = payload.payload.from;
-    const incomingMessage = payload.payload.body;
-    this.logger.log(`Pesan masuk dari ${senderNumber} via Session: ${sessionId}`);
-    this.logger.log(`Message ${sessionId} : ${incomingMessage}`);
-    await this.sendWhatsappMessage(sessionId, senderNumber, "Orang desa gak butuh dollar");
-    return { status: 'success' };
   }
 
   private async sendWhatsappMessage(session: string, to: string, text: string) {
@@ -63,6 +67,7 @@ export class WhatsappController {
       this.logger.log(`Berhasil membalas pesan ke ${to} menggunakan session ${session}`);
       return apiResponse.data
     } catch (error: any) {
+      console.log(error)
       this.logger.error(`Gagal mengirim pesan via GOWA: ${error.message}`);
       throw new BadRequestException("Something Wrong Send Message Webhook")
     }
@@ -77,7 +82,7 @@ export class WhatsappController {
 
 
   @Post("logout")
-  async logout(@Headers('X-Device-Id') deviceId: string){
+  async logout(@Headers('X-Device-Id') deviceId: string) {
     return await this.whatsappService.logoutDevice(deviceId)
   }
 
