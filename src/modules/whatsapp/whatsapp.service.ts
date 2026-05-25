@@ -164,4 +164,18 @@ export class WhatsappService {
     }
     return existing
   }
+
+  async logoutDevice(deviceId: string) {
+    const config = {
+      headers: {
+        'Authorization': this.authorization,
+        'X-Device-Id': deviceId
+      },
+    };
+    try {
+      return await firstValueFrom(this.httpService.get(`${this.gowaBaseUrl}/app/logout`, config));
+    } catch (error) {
+      throw new BadRequestException("Something Wrong with Logout Device")
+    }
+  }
 }

@@ -34,9 +34,6 @@ export class WhatsappController {
   @Post("gowa")
   async gowa(@Body() payload: any) {
     console.log(payload)
-    // if (!verifyWebhookSignature(payload, signature, String(process.env.GOWA_WEBHOOK_SECRET))) {
-    //   throw new UnauthorizedException("Unauthorized")
-    // }
     const eventType = payload.event;
     const sessionId = payload.device_id
     if (eventType !== 'message') {
@@ -78,6 +75,11 @@ export class WhatsappController {
     return await this.whatsappService.removeDevice(deviceId)
   }
 
+
+  @Post("logout")
+  async logout(@Headers('X-Device-Id') deviceId: string){
+    return await this.whatsappService.logoutDevice(deviceId)
+  }
 
 
 
